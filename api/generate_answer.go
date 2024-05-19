@@ -325,7 +325,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 type RequestData struct {
 	Seed       string `json:"seed"`
 	Difficulty string `json:"difficulty"`
-	UserAgent  string `json:"userAgent"`
-	Script     string `json:"script"`
-	CachedDpl  string `json:"cachedDpl"`
+	UserAgent  string `json:"user_agent"`
+	Script     string `json:"script_src"`
+	CachedDpl  string `json:"dpl"`
 }
