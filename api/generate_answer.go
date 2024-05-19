@@ -318,8 +318,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	answer := generateAnswer(requestData.Seed, requestData.Difficulty, requestData.UserAgent, requestData.Script, requestData.CachedDpl)
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(fmt.Sprintf(`{"answer":"%s"}`, answer)))
+	w.Write([]byte(answer))
 }
 
 type RequestData struct {
