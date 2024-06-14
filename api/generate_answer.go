@@ -18,14 +18,6 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-type Config struct {
-	Sum     int
-	Time    string
-	Const1  uint32
-	Counter int
-	Agent   string
-}
-
 var (
 	cores   = []int{8, 12, 16, 24}
 	screens = []int{3000, 4000, 6000}
@@ -118,13 +110,7 @@ var documentKeys = []string{
 
 var jsGlobals = []string{"0", "1", "window", "self", "document", "name", "location", "customElements", "history", "navigation", "locationbar", "menubar", "personalbar", "scrollbars", "statusbar", "toolbar", "status", "closed", "frames", "length", "top", "opener", "parent", "frameElement", "navigatorFp", "origin", "external", "screen", "innerWidth", "innerHeight", "scrollX", "pageXOffset", "scrollY", "pageYOffset", "visualViewport", "screenX", "screenY", "outerWidth", "outerHeight", "devicePixelRatio", "clientInformation", "screenLeft", "screenTop", "styleMedia", "onsearch", "isSecureContext", "trustedTypes", "performance", "onappinstalled", "onbeforeinstallprompt", "crypto", "indexedDB", "sessionStorage", "localStorage", "onbeforexrselect", "onabort", "onbeforeinput", "onbeforematch", "onbeforetoggle", "onblur", "oncancel", "oncanplay", "oncanplaythrough", "onchange", "onclick", "onclose", "oncontentvisibilityautostatechange", "oncontextlost", "oncontextmenu", "oncontextrestored", "oncuechange", "ondblclick", "ondrag", "ondragend", "ondragenter", "ondragleave", "ondragover", "ondragstart", "ondrop", "ondurationchange", "onemptied", "onended", "onerror", "onfocus", "onformdata", "oninput", "oninvalid", "onkeydown", "onkeypress", "onkeyup", "onload", "onloadeddata", "onloadedmetadata", "onloadstart", "onmousedown", "onmouseenter", "onmouseleave", "onmousemove", "onmouseout", "onmouseover", "onmouseup", "onmousewheel", "onpause", "onplay", "onplaying", "onprogress", "onratechange", "onreset", "onresize", "onscroll", "onsecuritypolicyviolation", "onseeked", "onseeking", "onselect", "onslotchange", "onstalled", "onsubmit", "onsuspend", "ontimeupdate", "ontoggle", "onvolumechange", "onwaiting", "onwebkitanimationend", "onwebkitanimationiteration", "onwebkitanimationstart", "onwebkittransitionend", "onwheel", "onauxclick", "ongotpointercapture", "onlostpointercapture", "onpointerdown", "onpointermove", "onpointerrawupdate", "onpointerup", "onpointercancel", "onpointerover", "onpointerout", "onpointerenter", "onpointerleave", "onselectstart", "onselectionchange", "onanimationend", "onanimationiteration", "onanimationstart", "ontransitionrun", "ontransitionstart", "ontransitionend", "ontransitioncancel", "onafterprint", "onbeforeprint", "onbeforeunload", "onhashchange", "onlanguagechange", "onmessage", "onmessageerror", "onoffline", "ononline", "onpagehide", "onpageshow", "onpopstate", "onrejectionhandled", "onstorage", "onunhandledrejection", "onunload", "crossOriginIsolated", "scheduler", "alert", "atob", "blur", "btoa", "cancelAnimationFrame", "cancelIdleCallback", "captureEvents", "clearInterval", "clearTimeout", "close", "confirm", "createImageBitmap", "fetch", "find", "focus", "getComputedStyle", "getSelection", "matchMedia", "moveBy", "moveTo", "open", "postMessage", "print", "prompt", "queueMicrotask", "releaseEvents", "reportError", "requestAnimationFrame", "requestIdleCallback", "resizeBy", "resizeTo", "scroll", "scrollBy", "scrollTo", "setInterval", "setTimeout", "stop", "structuredClone", "webkitCancelAnimationFrame", "webkitRequestAnimationFrame", "chrome", "fence", "caches", "cookieStore", "ondevicemotion", "ondeviceorientation", "ondeviceorientationabsolute", "launchQueue", "sharedStorage", "documentPictureInPicture", "getScreenDetails", "queryLocalFonts", "showDirectoryPicker", "showOpenFilePicker", "showSaveFilePicker", "originAgentCluster", "onpageswap", "onpagereveal", "credentialless", "speechSynthesis", "onscrollend", "webkitRequestFileSystem", "webkitResolveLocalFileSystemURL", "_sentryDebugIds", "webpackChunk_N_E", "__next_set_public_path__", "next", "__NEXT_DATA__", "__SSG_MANIFEST_CB", "__NEXT_P", "_N_E", "regeneratorRuntime", "__REACT_INTL_CONTEXT__", "DD_RUM", "_", "filterCSS", "filterXSS", "__SEGMENT_INSPECTOR__", "__NEXT_PRELOADREADY", "Intercom", "__MIDDLEWARE_MATCHERS", "__BUILD_MANIFEST", "__SSG_MANIFEST", "__STATSIG_SDK__", "__STATSIG_JS_SDK__", "__STATSIG_RERENDER_OVERRIDE__", "_oaiHandleSessionExpired", "__intercomAssignLocation", "__intercomReloadLocation"}
 
-var bufferPool = sync.Pool{
-	New: func() interface{} {
-		return new(bytes.Buffer)
-	},
-}
-
-func bytesCombine2(pBytes ...[]byte) []byte {
+func BytesCombine2(pBytes ...[]byte) []byte {
 	totalLen := 0
 	for _, b := range pBytes {
 		totalLen += len(b)
@@ -142,6 +128,12 @@ func bytesCombine2(pBytes ...[]byte) []byte {
 	return buffer.Bytes()
 }
 
+var bufferPool = sync.Pool{
+	New: func() interface{} {
+		return new(bytes.Buffer)
+	},
+}
+
 func getParseTime() string {
 	nowUTC := time.Now().UTC()
 
@@ -151,32 +143,28 @@ func getParseTime() string {
 	return formattedTime
 }
 
-func getConfig(userAgent, script, cachedDpl string) []interface{} {
-	rand.NewSource(time.Now().UnixNano())
-	core := cores[rand.Intn(len(cores))]
-	screen := screens[rand.Intn(len(screens))]
-	nfp := navigatorFp[rand.Intn(len(navigatorFp))]
-	dk := documentKeys[rand.Intn(len(documentKeys))]
-	wk := jsGlobals[rand.Intn(len(jsGlobals))]
-	return []interface{}{
-		core + screen,
-		getParseTime(),
-		int64(4294705152),
-		3,
-		userAgent,
-		script,
-		cachedDpl,
-		"zh-CN",
-		"zh-CN,en,en-GB,en-US",
-		9,
-		nfp,
-		dk,
-		wk,
-	}
+// 定义一个程序启动时的时间
+var startTime = time.Now()
+
+func refreshStartTime() {
+	startTime = time.Now()
 }
 
-func generateAnswer(seed, difficulty, userAgent, script, cachedDpl string) string {
-	config := getConfig(userAgent, script, cachedDpl)
+// performanceNow 返回自程序启动以来的时间，单位为毫秒
+func performanceNow() int64 {
+	// 获取当前时间
+	now := time.Now()
+
+	if now.Sub(startTime).Minutes() > 30 {
+		refreshStartTime()
+	}
+
+	return now.Sub(startTime).Milliseconds() + int64(rand.Intn(99999))
+}
+
+func generateAnswer(payload RequestData) string {
+	seed, difficulty := payload.Seed, payload.Difficulty
+	config := getConfig(payload)
 	diffLen := len(difficulty)
 	hasher := sha3.New512()
 	startTime := time.Now()
@@ -256,7 +244,7 @@ func generateAnswer(seed, difficulty, userAgent, script, cachedDpl string) strin
 		buffer.WriteString(strconv.FormatInt(config[9].(int64), 10))
 		buffer.WriteString(",")
 		config9Str := buffer.String()
-		insert1 := bytesCombine2(bufPart1, []byte(config3Str))
+		insert1 := BytesCombine2(bufPart1, []byte(config3Str))
 		var insertBase1 string
 		var insertBase2 string
 		var betweenPos3AndPos9Base string
@@ -266,11 +254,11 @@ func generateAnswer(seed, difficulty, userAgent, script, cachedDpl string) strin
 		if i == 0 {
 			insertBase1 = base64.StdEncoding.EncodeToString(insert1)
 			betweenPos3AndPos9Base = base64part2[0]
-			insert2 = bytesCombine2(bufAfterPart2[0], []byte(config9Str))
+			insert2 = BytesCombine2(bufAfterPart2[0], []byte(config9Str))
 		} else {
-			insertBase1 = base64.StdEncoding.EncodeToString(bytesCombine2(insert1, bufBeforePart2[3-i]))
+			insertBase1 = base64.StdEncoding.EncodeToString(BytesCombine2(insert1, bufBeforePart2[3-i]))
 			betweenPos3AndPos9Base = base64part2[3-i]
-			insert2 = bytesCombine2(bufAfterPart2[3-i], []byte(config9Str))
+			insert2 = BytesCombine2(bufAfterPart2[3-i], []byte(config9Str))
 		}
 
 		i = len(insert2) % 3
@@ -278,7 +266,7 @@ func generateAnswer(seed, difficulty, userAgent, script, cachedDpl string) strin
 			insertBase2 = base64.StdEncoding.EncodeToString(insert2)
 			afterPos9Base = base64part3[0]
 		} else {
-			insertBase2 = base64.StdEncoding.EncodeToString(bytesCombine2(insert2, bufBeforePart3[3-i]))
+			insertBase2 = base64.StdEncoding.EncodeToString(BytesCombine2(insert2, bufBeforePart3[3-i]))
 			afterPos9Base = base64part3[3-i]
 		}
 		buffer.Reset()
@@ -296,6 +284,32 @@ func generateAnswer(seed, difficulty, userAgent, script, cachedDpl string) strin
 		}
 	}
 	return "gAAAAABwQ8Lk5FbGpA2NcR9dShT6gYjU7VxZ4D" + base64.StdEncoding.EncodeToString([]byte(`"`+seed+`"`))
+}
+
+func getConfig(payload RequestData) []interface{} {
+	rand.NewSource(time.Now().UnixNano())
+	core := cores[rand.Intn(len(cores))]
+	screen := screens[rand.Intn(len(screens))]
+	nfp := navigatorFp[rand.Intn(len(navigatorFp))]
+	dk := documentKeys[rand.Intn(len(documentKeys))]
+	wk := jsGlobals[rand.Intn(len(jsGlobals))]
+	return []interface{}{
+		core + screen,
+		getParseTime(),
+		int64(4294705152),
+		3,
+		payload.UserAgent,
+		payload.Script,
+		payload.CachedDpl,
+		"zh-CN",
+		"zh-CN,en,en-GB,en-US",
+		9,
+		nfp,
+		dk,
+		wk,
+		performanceNow(),
+		payload.Sid,
+	}
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
@@ -317,7 +331,7 @@ func Handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	answer := generateAnswer(requestData.Seed, requestData.Difficulty, requestData.UserAgent, requestData.Script, requestData.CachedDpl)
+	answer := generateAnswer(requestData)
 	w.Write([]byte(answer))
 }
 
@@ -327,4 +341,5 @@ type RequestData struct {
 	UserAgent  string `json:"user_agent"`
 	Script     string `json:"script_src"`
 	CachedDpl  string `json:"dpl"`
+	Sid        string `json:"sid"`
 }
