@@ -19,6 +19,30 @@ import (
 )
 
 var (
+	cachedScripts     []string
+	cachedDpl         string
+	currentCpuUsage   float64
+	currentCpuUsageMu sync.Mutex
+)
+
+type Payload struct {
+	Seed       string `json:"seed"`
+	Difficulty string `json:"difficulty"`
+	UserAgent  string `json:"user_agent"`
+	ScriptSrc  string `json:"script_src"`
+	Dpl        string `json:"dpl"`
+	Sid        string `json:"sid"`
+}
+
+type Config struct {
+	Sum     int
+	Time    string
+	Const1  uint32
+	Counter int
+	Agent   string
+}
+
+var (
 	cores   = []int{8, 12, 16, 24}
 	screens = []int{3000, 4000, 6000}
 )
@@ -110,6 +134,60 @@ var documentKeys = []string{
 
 var jsGlobals = []string{"0", "1", "window", "self", "document", "name", "location", "customElements", "history", "navigation", "locationbar", "menubar", "personalbar", "scrollbars", "statusbar", "toolbar", "status", "closed", "frames", "length", "top", "opener", "parent", "frameElement", "navigatorFp", "origin", "external", "screen", "innerWidth", "innerHeight", "scrollX", "pageXOffset", "scrollY", "pageYOffset", "visualViewport", "screenX", "screenY", "outerWidth", "outerHeight", "devicePixelRatio", "clientInformation", "screenLeft", "screenTop", "styleMedia", "onsearch", "isSecureContext", "trustedTypes", "performance", "onappinstalled", "onbeforeinstallprompt", "crypto", "indexedDB", "sessionStorage", "localStorage", "onbeforexrselect", "onabort", "onbeforeinput", "onbeforematch", "onbeforetoggle", "onblur", "oncancel", "oncanplay", "oncanplaythrough", "onchange", "onclick", "onclose", "oncontentvisibilityautostatechange", "oncontextlost", "oncontextmenu", "oncontextrestored", "oncuechange", "ondblclick", "ondrag", "ondragend", "ondragenter", "ondragleave", "ondragover", "ondragstart", "ondrop", "ondurationchange", "onemptied", "onended", "onerror", "onfocus", "onformdata", "oninput", "oninvalid", "onkeydown", "onkeypress", "onkeyup", "onload", "onloadeddata", "onloadedmetadata", "onloadstart", "onmousedown", "onmouseenter", "onmouseleave", "onmousemove", "onmouseout", "onmouseover", "onmouseup", "onmousewheel", "onpause", "onplay", "onplaying", "onprogress", "onratechange", "onreset", "onresize", "onscroll", "onsecuritypolicyviolation", "onseeked", "onseeking", "onselect", "onslotchange", "onstalled", "onsubmit", "onsuspend", "ontimeupdate", "ontoggle", "onvolumechange", "onwaiting", "onwebkitanimationend", "onwebkitanimationiteration", "onwebkitanimationstart", "onwebkittransitionend", "onwheel", "onauxclick", "ongotpointercapture", "onlostpointercapture", "onpointerdown", "onpointermove", "onpointerrawupdate", "onpointerup", "onpointercancel", "onpointerover", "onpointerout", "onpointerenter", "onpointerleave", "onselectstart", "onselectionchange", "onanimationend", "onanimationiteration", "onanimationstart", "ontransitionrun", "ontransitionstart", "ontransitionend", "ontransitioncancel", "onafterprint", "onbeforeprint", "onbeforeunload", "onhashchange", "onlanguagechange", "onmessage", "onmessageerror", "onoffline", "ononline", "onpagehide", "onpageshow", "onpopstate", "onrejectionhandled", "onstorage", "onunhandledrejection", "onunload", "crossOriginIsolated", "scheduler", "alert", "atob", "blur", "btoa", "cancelAnimationFrame", "cancelIdleCallback", "captureEvents", "clearInterval", "clearTimeout", "close", "confirm", "createImageBitmap", "fetch", "find", "focus", "getComputedStyle", "getSelection", "matchMedia", "moveBy", "moveTo", "open", "postMessage", "print", "prompt", "queueMicrotask", "releaseEvents", "reportError", "requestAnimationFrame", "requestIdleCallback", "resizeBy", "resizeTo", "scroll", "scrollBy", "scrollTo", "setInterval", "setTimeout", "stop", "structuredClone", "webkitCancelAnimationFrame", "webkitRequestAnimationFrame", "chrome", "fence", "caches", "cookieStore", "ondevicemotion", "ondeviceorientation", "ondeviceorientationabsolute", "launchQueue", "sharedStorage", "documentPictureInPicture", "getScreenDetails", "queryLocalFonts", "showDirectoryPicker", "showOpenFilePicker", "showSaveFilePicker", "originAgentCluster", "onpageswap", "onpagereveal", "credentialless", "speechSynthesis", "onscrollend", "webkitRequestFileSystem", "webkitResolveLocalFileSystemURL", "_sentryDebugIds", "webpackChunk_N_E", "__next_set_public_path__", "next", "__NEXT_DATA__", "__SSG_MANIFEST_CB", "__NEXT_P", "_N_E", "regeneratorRuntime", "__REACT_INTL_CONTEXT__", "DD_RUM", "_", "filterCSS", "filterXSS", "__SEGMENT_INSPECTOR__", "__NEXT_PRELOADREADY", "Intercom", "__MIDDLEWARE_MATCHERS", "__BUILD_MANIFEST", "__SSG_MANIFEST", "__STATSIG_SDK__", "__STATSIG_JS_SDK__", "__STATSIG_RERENDER_OVERRIDE__", "_oaiHandleSessionExpired", "__intercomAssignLocation", "__intercomReloadLocation"}
 
+var bufferPool = sync.Pool{
+	New: func() interface{} {
+		return new(bytes.Buffer)
+	},
+}
+
+// 定义一个程序启动时的时间
+var startTime = time.Now()
+
+func refreshStartTime() {
+	startTime = time.Now()
+}
+
+// performanceNow 返回自程序启动以来的时间，单位为毫秒
+func performanceNow() float64 {
+	// 获取当前时间
+	now := time.Now()
+	// 增加一个随机的float64数 1000.0-9999.0
+	return float64(now.Sub(startTime).Milliseconds()) + rand.Float64()*9000.0 + 1000.0
+}
+
+func getParseTime() string {
+	nowUTC := time.Now()
+	gmtMinus4 := time.FixedZone("GMT-0400", -4*60*60)
+	formattedTime := nowUTC.In(gmtMinus4).Format("Mon Jan 02 2006 15:04:05")
+	return formattedTime + " GMT-0400 (Eastern Daylight Time)"
+}
+
+func getConfig(payload RequestData) []interface{} {
+	rand.NewSource(time.Now().UnixNano())
+	core := cores[rand.Intn(len(cores))]
+	screen := screens[rand.Intn(len(screens))]
+	nfp := navigatorFp[rand.Intn(len(navigatorFp))]
+	dk := documentKeys[rand.Intn(len(documentKeys))]
+	wk := jsGlobals[rand.Intn(len(jsGlobals))]
+	return []interface{}{
+		core + screen,
+		getParseTime(),
+		int64(4294705152),
+		3,
+		payload.UserAgent,
+		payload.Script,
+		cachedDpl,
+		"en-US",
+		"en-US,en",
+		9,
+		nfp,
+		dk,
+		wk,
+		performanceNow(),
+		payload.Sid,
+	}
+}
+
 func BytesCombine2(pBytes ...[]byte) []byte {
 	totalLen := 0
 	for _, b := range pBytes {
@@ -126,40 +204,6 @@ func BytesCombine2(pBytes ...[]byte) []byte {
 	}
 
 	return buffer.Bytes()
-}
-
-var bufferPool = sync.Pool{
-	New: func() interface{} {
-		return new(bytes.Buffer)
-	},
-}
-
-func getParseTime() string {
-	nowUTC := time.Now().UTC()
-
-	nowChina := nowUTC.Add(8 * time.Hour)
-	formattedTime := nowChina.Format("Mon Jan 02 2006 15:04:05 GMT+0800 (中国标准时间)")
-
-	return formattedTime
-}
-
-// 定义一个程序启动时的时间
-var startTime = time.Now()
-
-func refreshStartTime() {
-	startTime = time.Now()
-}
-
-// performanceNow 返回自程序启动以来的时间，单位为毫秒
-func performanceNow() int64 {
-	// 获取当前时间
-	now := time.Now()
-
-	if now.Sub(startTime).Minutes() > 30 {
-		refreshStartTime()
-	}
-
-	return now.Sub(startTime).Milliseconds() + int64(rand.Intn(99999))
 }
 
 func generateAnswer(payload RequestData) string {
@@ -225,10 +269,16 @@ func generateAnswer(payload RequestData) string {
 
 	var buffer bytes.Buffer
 	buffer.Grow(initialSize)
+	config3Str := ""
+	config9Str := ""
+	insert1 := make([]byte, 0)
+	index1 := 0
+	index2 := 0
+	base := ""
+	hash := make([]byte, 0)
 	for i := 0; i < 500000; i++ {
 		config[3] = i
-		endTime := time.Now()
-		elapsed := endTime.Sub(startTime)
+		elapsed := time.Now().Sub(startTime)
 		config[9] = elapsed.Milliseconds()
 		if elapsed >= time.Duration(10)*time.Second {
 			break
@@ -237,37 +287,37 @@ func generateAnswer(payload RequestData) string {
 		buffer.WriteString(",")
 		buffer.WriteString(strconv.Itoa(config[3].(int)))
 		buffer.WriteString(",")
-		config3Str := buffer.String()
+		config3Str = buffer.String()
 
 		buffer.Reset()
 		buffer.WriteString(",")
 		buffer.WriteString(strconv.FormatInt(config[9].(int64), 10))
 		buffer.WriteString(",")
-		config9Str := buffer.String()
-		insert1 := BytesCombine2(bufPart1, []byte(config3Str))
+		config9Str = buffer.String()
+		insert1 = BytesCombine2(bufPart1, []byte(config3Str))
 		var insertBase1 string
 		var insertBase2 string
 		var betweenPos3AndPos9Base string
 		var afterPos9Base string
 		var insert2 []byte
-		i := len(insert1) % 3
-		if i == 0 {
+		index1 = len(insert1) % 3
+		if index1 == 0 {
 			insertBase1 = base64.StdEncoding.EncodeToString(insert1)
 			betweenPos3AndPos9Base = base64part2[0]
 			insert2 = BytesCombine2(bufAfterPart2[0], []byte(config9Str))
 		} else {
-			insertBase1 = base64.StdEncoding.EncodeToString(BytesCombine2(insert1, bufBeforePart2[3-i]))
-			betweenPos3AndPos9Base = base64part2[3-i]
-			insert2 = BytesCombine2(bufAfterPart2[3-i], []byte(config9Str))
+			insertBase1 = base64.StdEncoding.EncodeToString(BytesCombine2(insert1, bufBeforePart2[3-index1]))
+			betweenPos3AndPos9Base = base64part2[3-index1]
+			insert2 = BytesCombine2(bufAfterPart2[3-index1], []byte(config9Str))
 		}
 
-		i = len(insert2) % 3
-		if i == 0 {
+		index2 = len(insert2) % 3
+		if index2 == 0 {
 			insertBase2 = base64.StdEncoding.EncodeToString(insert2)
 			afterPos9Base = base64part3[0]
 		} else {
-			insertBase2 = base64.StdEncoding.EncodeToString(BytesCombine2(insert2, bufBeforePart3[3-i]))
-			afterPos9Base = base64part3[3-i]
+			insertBase2 = base64.StdEncoding.EncodeToString(BytesCombine2(insert2, bufBeforePart3[3-index2]))
+			afterPos9Base = base64part3[3-index2]
 		}
 		buffer.Reset()
 		buffer.WriteString(beforePos3Base)
@@ -275,41 +325,15 @@ func generateAnswer(payload RequestData) string {
 		buffer.WriteString(betweenPos3AndPos9Base)
 		buffer.WriteString(insertBase2)
 		buffer.WriteString(afterPos9Base)
-		base := buffer.String()
+		base = buffer.String()
 		hasher.Write([]byte(seed + base))
-		hash := hasher.Sum(nil)
+		hash = hasher.Sum(nil)
 		hasher.Reset()
 		if hex.EncodeToString(hash[:diffLen])[:diffLen] <= difficulty {
 			return "gAAAAAB" + string(base)
 		}
 	}
 	return "gAAAAABwQ8Lk5FbGpA2NcR9dShT6gYjU7VxZ4D" + base64.StdEncoding.EncodeToString([]byte(`"`+seed+`"`))
-}
-
-func getConfig(payload RequestData) []interface{} {
-	rand.NewSource(time.Now().UnixNano())
-	core := cores[rand.Intn(len(cores))]
-	screen := screens[rand.Intn(len(screens))]
-	nfp := navigatorFp[rand.Intn(len(navigatorFp))]
-	dk := documentKeys[rand.Intn(len(documentKeys))]
-	wk := jsGlobals[rand.Intn(len(jsGlobals))]
-	return []interface{}{
-		core + screen,
-		getParseTime(),
-		int64(4294705152),
-		3,
-		payload.UserAgent,
-		payload.Script,
-		payload.CachedDpl,
-		"zh-CN",
-		"zh-CN,en,en-GB,en-US",
-		9,
-		nfp,
-		dk,
-		wk,
-		performanceNow(),
-		payload.Sid,
-	}
 }
 
 func Handler(w http.ResponseWriter, r *http.Request) {
