@@ -19,30 +19,6 @@ import (
 )
 
 var (
-	cachedScripts     []string
-	cachedDpl         string
-	currentCpuUsage   float64
-	currentCpuUsageMu sync.Mutex
-)
-
-type Payload struct {
-	Seed       string `json:"seed"`
-	Difficulty string `json:"difficulty"`
-	UserAgent  string `json:"user_agent"`
-	ScriptSrc  string `json:"script_src"`
-	Dpl        string `json:"dpl"`
-	Sid        string `json:"sid"`
-}
-
-type Config struct {
-	Sum     int
-	Time    string
-	Const1  uint32
-	Counter int
-	Agent   string
-}
-
-var (
 	cores   = []int{8, 12, 16, 24}
 	screens = []int{3000, 4000, 6000}
 )
@@ -176,7 +152,7 @@ func getConfig(payload RequestData) []interface{} {
 		3,
 		payload.UserAgent,
 		payload.Script,
-		cachedDpl,
+		payload.CachedDpl,
 		"en-US",
 		"en-US,en",
 		9,
